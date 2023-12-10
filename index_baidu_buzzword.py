@@ -1,5 +1,5 @@
-import datetime,requests,time,random,jsonpath,json
-import json,execjs
+import datetime, requests, jsonpath, json
+import json, execjs
 import os
 import sys
 
@@ -7,6 +7,7 @@ import pandas as pd
 from os.path import exists
 from os import makedirs
 
+# 指定目录
 RESULTS_DIR_INDEX = 'buzzword_index_tmp'
 exists(RESULTS_DIR_INDEX) or makedirs(RESULTS_DIR_INDEX)
 
@@ -18,6 +19,9 @@ exists(RESULTS_DIR_INTEREST) or makedirs(RESULTS_DIR_INTEREST)
 
 RESULTS_DIR_GENDER = 'buzzword_gender_tmp'
 exists(RESULTS_DIR_GENDER) or makedirs(RESULTS_DIR_GENDER)
+
+# none-exist 词语
+none_word = []
 
 headers = {
         'Cipher-Text': '1683381603090_1683465841465_cBL6JPQcXfYJb8GTBNZ7oLh07nimUUJmt9KQ3M5o0yYJjB8ugeggt6ONlReMzjsaz+4VL/W4Q6ojWnHF6MW7LTbY5qSnyttbKOtqUwVrTFRz1G7gLwkYhVz/fBoHdlDVDW19uELBDoWcpzXcS2QCAubDcC0+sKqDdAVh3X5cBOQNFQt1sTrBu7xyjhPzexvGw8XLtEqcpMhIdo3qIIgYxR2eFvBo4uMhpIxtwdR4afc7+F3VwyoqlLCay1PAlNgumc9u4A3Fz8weOYWqpvrGt6Kfu0tjxH4p4joL2uH5A2/qpEmt3OTFrvgWcq76vRFhoyJbTBAKPMRVdikqq8xTnI4fgQ6nODO/QqIx7PHsaUx5lS7fRpnue6nHYtrwQrFDq/gczjDIto3W8ilskoNO4h//ZHl1C+YVOzk0dlULzrS/VqTVMqpvc8YG0MZyhokH',
@@ -43,7 +47,31 @@ def getData_task():
         year = row['年份']
         start_date = f"{year}-01-01"
         end_date = f"{year}-12-31"
-        get_feedIndex_datas(0, keyword=keyword, y_start=start_date, y_end=end_date)
+        if check_data_exist(keyword):
+            get_feedIndex_datas(0, keyword=keyword, y_start=start_date, y_end=end_date)
+            get_interest_datas(keyword=keyword, year=year)
+            get_age_datas(keyword=keyword, year=year)
+            get_gender_datas(keyword=keyword, year=year)
+        else:
+            print(f"{keyword} 未被收录")
+            none_word.append(keyword)
+            continue
+
+
+# 判断数据是否存在，再进行读数据
+def check_data_exist(keyword):
+    try:
+        keyword = str(keyword).replace("'", '"')
+        indexData_url = f'https://index.baidu.com/api/SearchApi/index?area=0&word=[[%7B%22name%22:%22{keyword}%22,%22wordType%22:1%7D]]'
+        indexData = get_url_res(indexData_url)
+        # 检查是否成功获取数据!!!!
+        if not indexData or 'data' not in indexData.json() or 'uniqid' not in indexData.json()['data']:
+            print(f'数据对于关键字 {keyword} 不存在，跳过')
+            return False
+        else:
+            return True
+    except Exception as e:
+        print(f"{e}")
 
 
 # 搜索指数数据解密
@@ -84,11 +112,11 @@ def get_url_res(url):
         print("error occured while scraping %s", url)
 
 
-#将年份传入，然后对年份进行操作
-def get_feedIndex_datas(d_index,keyword,y_start,y_end):
+# 将年份传入，然后对年份进行操作
+def get_feedIndex_datas(d_index, keyword, y_start, y_end):
     # 测试是能够正常请求到加密的密文 url是接口url, indexData用于存放返回包的数据
     keyword = str(keyword).replace("'", '"')
-    # indexData_url = f'https://index.baidu.com/api/SearchApi/index?area={d_index}&word=[[%7B%22name%22:%22{keyword}%22,%22wordType%22:1%7D]]&startDate={y_start}-01-01&endDate={y_end}-12-31'
+    # startDate={y_start}-01-01&endDate={y_end}-12-31
     indexData_url = f'https://index.baidu.com/api/SearchApi/index?area={d_index}&word=[[%7B%22name%22:%22{keyword}%22,%22wordType%22:1%7D]]&startDate={y_start}&endDate={y_end}'
     ptbk_url = 'https://index.baidu.com/Interface/ptbk?uniqid='
 
@@ -154,7 +182,7 @@ def get_feedIndex_datas(d_index,keyword,y_start,y_end):
         # 将数据保存到文件中
         df.to_csv(file_path)
         return
-    except  Exception as e:
+    except Exception as e:
         # 打印异常信息并继续执行后续操作
         print(f"处理关键字 '{keyword}' 时发生异常: {e}")
         return  # 跳出当前函数的执行，继续后续关键词的处理
@@ -164,7 +192,7 @@ def get_baseAttr_interest_task():
     for index, row in df.iterrows():
         keyword = row['词汇']
         year = row['年份']
-        get_interest_datas(keyword=keyword,year=year)
+        get_interest_datas(keyword=keyword, year=year)
 
 
 def get_interest_datas(keyword, year):
@@ -208,7 +236,7 @@ def get_baseAttr_age_task():
     for index, row in df.iterrows():
         keyword = row['词汇']
         year = row['年份']
-        get_age_datas(keyword=keyword,year=year)
+        get_age_datas(keyword=keyword, year=year)
 
 
 # 用户画像中的年份，性别数据可以不要unipid,有一个cookie就可以直接请求，甚至不需要请求的年份
@@ -258,8 +286,11 @@ def get_baseAttr_gender_task():
     for index, row in df.iterrows():
         keyword = row['词汇']
         year = row['年份']
-        get_gender_datas(keyword=keyword,year=year)
-
+        try:
+            get_gender_datas(keyword=keyword, year=year)
+        except Exception as e:
+            print(f"采集失败：{e}")
+            continue
 
 # 用户画像中的年份，性别数据可以不要unipid,有一个cookie就可以直接请求，甚至不需要请求的年份
 def get_gender_datas(keyword, year):
@@ -302,99 +333,13 @@ def get_gender_datas(keyword, year):
         return  # 跳出当前函数的执行，继续后续关键词的处理
 
 
-# 将年份传入，然后对年份进行操作 。。废了，不想清洗数据了，做做人物画像得了 这个功能废了不要管了
-def get_feedIndex_datas_all(d_index,keyword,y_start,y_end):
-    # 测试是能够正常请求到加密的密文 url是接口url, indexData用于存放返回包的数据
-    keyword = str(keyword).replace("'", '"')
-    indexData_url = f'https://index.baidu.com/api/SearchApi/index?area={d_index}&word=[[%7B%22name%22:%22{keyword}%22,%22wordType%22:1%7D]]'
-    ptbk_url = 'https://index.baidu.com/Interface/ptbk?uniqid='
-
-    indexData = get_url_res(indexData_url)
-
-    # 检查是否成功获取数据!!!!
-    if not indexData or 'data' not in indexData.json() or 'uniqid' not in indexData.json()['data']:
-        print(f'数据对于关键字 {keyword} 不存在，跳过')
-        return
-
-    # 获取unipid用于解密数据 (是uniqid不是pid)
-    uniqid = indexData.json()['data']['uniqid']
-    print(f'unipid is {uniqid}')
-
-    # 将unipid传参，ptbk是一个加解密用的url，使用unipid解密后得到decData,
-    decData = get_url_res(ptbk_url + uniqid)
-    # 获取状态码
-    decData.raise_for_status()
-    # 统一解密用的密钥和密文用一种编码
-    decData.encoding = indexData.apparent_encoding
-
-    # 处理返回包的json数据
-    startDate = indexData.json()['data']['userIndexes'][0]['all']['startDate']
-    endDate = indexData.json()['data']['userIndexes'][0]['all']['endDate']
-    print(f'数据是{keyword}, {startDate}, {endDate}')
-
-    # 遍历每一个数据，然后用key
-    sources = jsonpath.jsonpath(indexData.json(), '$..all.data')
-    # 密钥
-    key = decData.json()['data']
-    print(key)
-
-    # dataLs可以包括起始日期的所有字符串
-    dateStart = datetime.datetime.strptime(startDate, '%Y-%m-%d')
-    dateEnd = datetime.datetime.strptime(endDate, '%Y-%m-%d')
-    str_datastart = str(dateStart)[0:10]
-    str_dataend = str(dateEnd)[0:10]
-    dataLs = []
-    while dateStart <= dateEnd:
-        dataLs.append(str(dateStart)[0:10])
-        dateStart += datetime.timedelta(days=1)
-
-    # 这里是使用key进行解密。好的，可以解密，
-    for source in sources:
-        res = decrypt(key, source)
-        resArr = res.split(",")
-
-    print(resArr)
-    print(dataLs)
-    print("  datdaLs:  " + str(len(dataLs)) + "  resArr  " + str(len(resArr)))
-
-    # 找到第一个非空值的索引
-    first_valid_index = next((i for i, x in enumerate(resArr) if x != "" and x != "0"), None)
-    print(first_valid_index)
-    if first_valid_index is not None:
-        # 从第一个非空元素开始映射数据 注意是切片不要忘了:
-        dataLs = dataLs[first_valid_index:]
-        resArr = resArr[first_valid_index:]
-        try:
-            # 创建dataframe 将爬取到的数据建立映射到dataframe这个数据接口中，然后保存
-            df = pd.DataFrame(
-                {
-                    'Date': dataLs,
-                    'DecryptedData': resArr
-                }
-            )
-            file_name = f"{keyword}-{str_datastart}-{str_dataend}.csv"
-            # 将索引列的名称修改为 "点赞"
-            df.index.name = f"{keyword}"
-            # 构建完整的文件路径
-            file_path = os.path.join(RESULTS_DIR_INDEX, file_name)
-            # 将数据保存到文件中
-            df.to_csv(file_path)
-            return
-        except Exception as e:
-            # 打印异常信息并继续执行后续操作
-            print(f"处理关键字 '{keyword}' 时发生异常: {e}")
-            return  # 跳出当前函数的执行，继续后续关键词的处理
-    else:
-        print(f"关键词 {keyword} 在指定时间范围内没有有效的搜索量数据")
-
-
 if __name__ == '__main__':
-    # getData_task()
+    getData_task()
     # get_baseAttr_age_task()
     # get_baseAttr_gender_task()
     # get_baseAttr_interest_task()
 
-    get_feedIndex_datas(0, "chatgpt", "2023-01-01", "2023-12-09")
-    get_age_datas("chatgpt", 2023)
-    get_interest_datas("chatgpt", 2023)
-    get_gender_datas("chatgpt", 2023)
+    # get_feedIndex_datas(0, "chatgpt", "2023-01-01", "2023-12-09")
+    # get_age_datas("chatgpt", 2023)
+    # get_interest_datas("chatgpt", 2023)
+    # get_gender_datas("chatgpt", 2023)
