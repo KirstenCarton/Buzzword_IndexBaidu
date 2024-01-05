@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Search Interface</title>
+    <script>
+        function displayResults(results) {
+            var container = document.getElementById('resultsContainer');
+            container.innerHTML = ''; // 清空旧结果
+
+            results.forEach(function(result) {
+                var ul = document.createElement('ul');
+                for (var key in result) {
+                    if (result.hasOwnProperty(key)) {
+                        var li = document.createElement('li');
+                        li.appendChild(document.createTextNode(key + ': ' + JSON.stringify(result[key])));
+                        ul.appendChild(li);
+                    }
+                }
+                container.appendChild(ul);
+            });
+        }
+    </script>
+</head>
+<body>
+    <h2>Search</h2>
+    <form action="/search" method="get">
+        <label for="index">Choose an index:</label>
+        <select name="index" id="index">
+            <option value="age_index">Age Index</option>
+            <option value="gender_index">Gender Index</option>
+            <option value="search_index">Search Index</option>
+            <option value="interest_index">Interest Index</option>
+        </select>
+        <br><br>
+        <label for="keyword">Keyword:</label>
+        <input type="text" id="keyword" name="keyword">
+        <br><br>
+        <input type="submit" value="Search">
+    </form>
+    <br>
+    <div id="resultsContainer"></div>
+    {% if results %}
+<!--        <h3>Results:</h3>-->
+<!--        <ul>-->
+<!--        {% for result in results %}-->
+<!--            <li>{{ result }}</li>-->
+    displayResults({{ results|tojson|safe }});
+        {% endfor %}
+        </ul>
+    {% endif %}
+
+</body>
+</html>
